@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly PI Atlas watchdog
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

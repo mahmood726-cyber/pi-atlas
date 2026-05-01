@@ -1,0 +1,22 @@
+# ~/pi-atlas/systemd/pi-atlas-worker@.service
+# Install: cp to ~/.config/systemd/user/ and `systemctl --user daemon-reload`
+
+[Unit]
+Description=PI Atlas worker %I
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/pi-atlas
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=%h/pi-atlas/.venv/bin/python -m pi_atlas.worker_main --worker-id %i
+Restart=always
+RestartSec=30
+# Cap memory per worker to ~1.5 GB to stay inside 16 GB total across 8 workers
+MemoryMax=1500M
+# Write stdout+stderr to journal
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

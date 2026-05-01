@@ -1,56 +1,19 @@
-# Python
 __pycache__/
-*.py[cod]
+*.pyc
+.venv/
 *.egg-info/
+build/
+dist/
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Environments
-.venv/
-venv/
-env/
-
-# IDE
-.vscode/
-.idea/
-
-# Claude Code session state
-.claude/
-
-# Project-local progress notes (per rules.md)
-PROGRESS.md
-STUCK_FAILURES.md
-STUCK_FAILURES.jsonl
-sentinel-findings.md
-sentinel-findings.jsonl
-review-findings.md
-review-findings.jsonl
-
-# Compute outputs (year-long simulation — only summaries committed back)
-results/
-cache/
-scratch/
-chains/
-outputs/intermediate/
-*.parquet
-*.feather
-*.pkl
-*.npz
-*.h5
-*.hdf5
-*.rds
-*.RData
-
-# Compute logs
-logs/
-*.log
-nohup.out
-
-# Source corpus (never commit — pulled from external paths via env vars)
-data/raw/
-data/pairwise70/
-
-# OS
-.DS_Store
-Thumbs.db
+*.duckdb
+*.duckdb.wal
+results/*.parquet
+!baseline-fixture/expected.parquet
+manifest.csv
+.RData
+.Rhistory
+renv/library/
+renv/python/
+renv/staging/
