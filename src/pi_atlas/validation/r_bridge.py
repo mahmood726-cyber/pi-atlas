@@ -47,12 +47,44 @@ jsonlite::write_json(out, output_path, auto_unbox = TRUE, digits = 15)
 """
 
 
-def metafor_hts_dl(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.05) -> Dict:
-    """Call metafor::rma(method='DL') + predict() via Rscript subprocess.
+R_SCRIPT_PM = r"""
+.libPaths(c("C:/Users/mahmo/Documents/R/win-library/4.6", .libPaths()))
+suppressPackageStartupMessages(library(metafor))
+args <- commandArgs(trailingOnly = TRUE)
+input_path <- args[1]
+output_path <- args[2]
 
-    Returns the same dict shape as pi_atlas.methods.hts_dl.fit_hts_dl.
-    """
-    import numpy as np  # local import to avoid top-level dep for production workers
+payload <- jsonlite::fromJSON(input_path)
+y <- payload$y
+v <- payload$v
+alpha <- payload$alpha
+
+res <- rma(yi = y, vi = v, method = "PM")
+
+k <- res$k
+t_crit <- qt(1 - alpha/2, df = k - 2)
+pi_half <- t_crit * sqrt(res$tau2 + res$vb)
+pi_lower <- as.numeric(res$b - pi_half)
+pi_upper <- as.numeric(res$b + pi_half)
+
+out <- list(
+  mu_hat = as.numeric(res$b),
+  mu_ci_lower = as.numeric(res$ci.lb),
+  mu_ci_upper = as.numeric(res$ci.ub),
+  tau2 = as.numeric(res$tau2),
+  pi_lower = pi_lower,
+  pi_upper = pi_upper,
+  k = as.integer(res$k),
+  Q = as.numeric(res$QE)
+)
+jsonlite::write_json(out, output_path, auto_unbox = TRUE, digits = 15)
+"""
+
+def _metafor_generic(y: Sequence[float], v: Sequence[float], alpha: float, r_script: str) -> Dict:
+    import tempfile
+    import json
+    import subprocess
+    import numpy as np
 
     with tempfile.TemporaryDirectory() as d:
         dpath = Path(d)
@@ -60,12 +92,11 @@ def metafor_hts_dl(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.0
         input_path = dpath / "input.json"
         output_path = dpath / "output.json"
 
-        script_path.write_text(R_SCRIPT, encoding="utf-8")
+        script_path.write_text(r_script, encoding="utf-8")
         input_path.write_text(
             json.dumps({"y": list(map(float, y)), "v": list(map(float, v)), "alpha": alpha})
         )
 
-        # Rscript full path
         rscript_exe = r"C:\Program Files\R\R-4.6.0\bin\Rscript.exe"
 
         proc = subprocess.run(
@@ -79,10 +110,116 @@ def metafor_hts_dl(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.0
 
         out = json.loads(output_path.read_text())
 
-    # jsonlite auto_unbox=TRUE returns scalars as themselves, not 1-vectors.
-    # Defensive: if anything comes as a list, take [0].
     for k_ in list(out):
         if isinstance(out[k_], list) and len(out[k_]) == 1:
             out[k_] = out[k_][0]
 
     return out
+
+R_SCRIPT_REML = r"""
+.libPaths(c("C:/Users/mahmo/Documents/R/win-library/4.6", .libPaths()))
+suppressPackageStartupMessages(library(metafor))
+args <- commandArgs(trailingOnly = TRUE)
+input_path <- args[1]
+output_path <- args[2]
+
+payload <- jsonlite::fromJSON(input_path)
+y <- payload$y
+v <- payload$v
+alpha <- payload$alpha
+
+res <- rma(yi = y, vi = v, method = "REML")
+
+k <- res$k
+t_crit <- qt(1 - alpha/2, df = k - 2)
+pi_half <- t_crit * sqrt(res$tau2 + res$vb)
+pi_lower <- as.numeric(res$b - pi_half)
+pi_upper <- as.numeric(res$b + pi_half)
+
+out <- list(
+  mu_hat = as.numeric(res$b),
+  mu_ci_lower = as.numeric(res$ci.lb),
+  mu_ci_upper = as.numeric(res$ci.ub),
+  tau2 = as.numeric(res$tau2),
+  pi_lower = pi_lower,
+  pi_upper = pi_upper,
+  k = as.integer(res$k),
+  Q = as.numeric(res$QE)
+)
+jsonlite::write_json(out, output_path, auto_unbox = TRUE, digits = 15)
+"""
+
+def metafor_hts_dl(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.05) -> Dict:
+    return _metafor_generic(y, v, alpha, R_SCRIPT)
+
+R_SCRIPT_SJ = r"""
+.libPaths(c("C:/Users/mahmo/Documents/R/win-library/4.6", .libPaths()))
+suppressPackageStartupMessages(library(metafor))
+args <- commandArgs(trailingOnly = TRUE)
+input_path <- args[1]
+output_path <- args[2]
+
+payload <- jsonlite::fromJSON(input_path)
+y <- payload$y
+v <- payload$v
+alpha <- payload$alpha
+
+res <- rma(yi = y, vi = v, method = "SJ")
+
+k <- res$k
+t_crit <- qt(1 - alpha/2, df = k - 2)
+pi_half <- t_crit * sqrt(res$tau2 + res$vb)
+pi_lower <- as.numeric(res$b - pi_half)
+pi_upper <- as.numeric(res$b + pi_half)
+
+out <- list(
+  mu_hat = as.numeric(res$b),
+  mu_ci_lower = as.numeric(res$ci.lb),
+  mu_ci_upper = as.numeric(res$ci.ub),
+  tau2 = as.numeric(res$tau2),
+  pi_lower = pi_lower,
+  pi_upper = pi_upper,
+  k = as.integer(res$k),
+  Q = as.numeric(res$QE)
+)
+jsonlite::write_json(out, output_path, auto_unbox = TRUE, digits = 15)
+"""
+
+def metafor_hts_sj(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.05) -> Dict:
+    return _metafor_generic(y, v, alpha, R_SCRIPT_SJ)
+
+R_SCRIPT_HKSJ = r"""
+.libPaths(c("C:/Users/mahmo/Documents/R/win-library/4.6", .libPaths()))
+suppressPackageStartupMessages(library(metafor))
+args <- commandArgs(trailingOnly = TRUE)
+input_path <- args[1]
+output_path <- args[2]
+
+payload <- jsonlite::fromJSON(input_path)
+y <- payload$y
+v <- payload$v
+alpha <- payload$alpha
+
+res <- rma(yi = y, vi = v, method = "DL", test = "knha")
+
+k <- res$k
+t_crit <- qt(1 - alpha/2, df = k - 2)
+pi_half <- t_crit * sqrt(res$tau2 + res$vb)
+pi_lower <- as.numeric(res$b - pi_half)
+pi_upper <- as.numeric(res$b + pi_half)
+
+out <- list(
+  mu_hat = as.numeric(res$b),
+  mu_ci_lower = as.numeric(res$ci.lb),
+  mu_ci_upper = as.numeric(res$ci.ub),
+  tau2 = as.numeric(res$tau2),
+  pi_lower = pi_lower,
+  pi_upper = pi_upper,
+  k = as.integer(res$k),
+  Q = as.numeric(res$QE)
+)
+jsonlite::write_json(out, output_path, auto_unbox = TRUE, digits = 15)
+"""
+
+def metafor_hksj(y: Sequence[float], v: Sequence[float], *, alpha: float = 0.05) -> Dict:
+    return _metafor_generic(y, v, alpha, R_SCRIPT_HKSJ)
